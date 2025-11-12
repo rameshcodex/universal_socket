@@ -31,6 +31,7 @@ export default class UniversalSocket {
     let url;
     if (this.type === "binance") url = "wss://stream.binance.com:9443/ws";
     else if (this.type === "bybit") url = "wss://stream.bybit.com/v5/public/spot";
+    else if (this.type === "bitget") url = "wss://ws.bitget.com/v2/ws/public";
     else throw new Error("Unsupported exchange type: " + this.type);
 
     this.ws = new WebSocket(url);
@@ -80,8 +81,14 @@ export default class UniversalSocket {
     normalized.forEach((sym) => {
       const topic =
         this.type === "binance"
-          ? `${sym.toLowerCase()}@ticker`
-          : `tickers.${sym}`;
+          ? `${sym.toLowerCase()}@ticker` :
+          this.type === "bybit" ?
+            `tickers.${sym}` :
+            {
+              "instType": "SPOT",
+              "channel": "ticker",
+              "instId": sym
+            };
       this._sendSubscribe(topic);
     });
   }
@@ -92,8 +99,14 @@ export default class UniversalSocket {
     normalized.forEach((sym) => {
       const topic =
         this.type === "binance"
-          ? `${sym.toLowerCase()}@ticker`
-          : `tickers.${sym}`;
+          ? `${sym.toLowerCase()}@ticker` :
+          this.type === "bybit" ?
+            `tickers.${sym}` :
+            {
+              "instType": "SPOT",
+              "channel": "ticker",
+              "instId": sym
+            };
       this._unsendSubscribe(topic);
     });
   }
@@ -117,6 +130,7 @@ export default class UniversalSocket {
   // --- Internal helpers ---
 
   _sendSubscribe(topic) {
+    console.log("🚀 ~ UniversalSocket ~ _sendSubscribe ~ topic:", topic)
     if (!this.ws || this.ws.readyState !== 1) return;
     try {
       if (this.type === "binance") {
@@ -124,6 +138,8 @@ export default class UniversalSocket {
           JSON.stringify({ method: "SUBSCRIBE", params: [topic], id: Date.now() })
         );
       } else if (this.type === "bybit") {
+        this.ws.send(JSON.stringify({ op: "subscribe", args: [topic] }));
+      } else if (this.type === "bitget") {
         this.ws.send(JSON.stringify({ op: "subscribe", args: [topic] }));
       }
     } catch (_) { }
@@ -146,6 +162,7 @@ export default class UniversalSocket {
     let data;
     try {
       data = JSON.parse(raw);
+      console.log("🚀 ~ UniversalSocket ~ _onMessage ~ data:", data)
     } catch (_) {
       return;
     }

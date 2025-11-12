@@ -1,6 +1,6 @@
 import UniversalSocket from "universal-socket-react";
 
-const ws = new UniversalSocket({ type: "binance" });
+const ws = new UniversalSocket({ type: "bitget" });
 
 // Wait until connected
 ws.onOpen(() => {
