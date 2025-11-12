@@ -1,0 +1,23 @@
+{
+  "name": "universal-socket-react",
+  "version": "0.1.0",
+  "description": "UniversalSocket (ticker-only) for Binance and Bybit \u2014 React-friendly ESM package.",
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "type": "module",
+  "files": [
+    "src",
+    "example",
+    "README.md"
+  ],
+  "keywords": [
+    "websocket",
+    "binance",
+    "bybit",
+    "ticker",
+    "react",
+    "crypto"
+  ],
+  "author": "Solutions Buddy",
+  "license": "MIT"
+}

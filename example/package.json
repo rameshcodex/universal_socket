@@ -1,0 +1,18 @@
+{
+  "name": "universal-socket-example",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "universal-socket-react": "file:../universal-socket-react-0.1.0.tgz"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}
