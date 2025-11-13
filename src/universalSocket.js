@@ -11,8 +11,9 @@
  */
 
 export default class UniversalSocket {
-  constructor({ type = "binance", autoConnect = true } = {}) {
+  constructor({ type = "binance", autoConnect = true, tradeType = "spot" } = {}) {
     this.type = String(type).toLowerCase();
+    this.tradeType = String(tradeType).toLowerCase();
     this.ws = null;
     this.callbacks = {
       ticker: new Set(),
@@ -29,9 +30,11 @@ export default class UniversalSocket {
     if (this.ws && (this.ws.readyState === 1 || this.ws.readyState === 0)) return;
 
     let url;
-    if (this.type === "binance") url = "wss://stream.binance.com:9443/ws";
-    else if (this.type === "bybit") url = "wss://stream.bybit.com/v5/public/spot";
-    else if (this.type === "bitget") url = "wss://ws.bitget.com/v2/ws/public";
+    if (this.type === "binance" && this.tradeType == "spot") url = "wss://stream.binance.com:9443/ws";
+    else if (this.type === "bybit" && this.tradeType == "spot") url = "wss://stream.bybit.com/v5/public/spot";
+    else if (this.type === "bitget" ) url = "wss://ws.bitget.com/v2/ws/public";
+    else if (this.type === "binance" && this.tradeType == "futures") url = "wss://fstream.binance.com/ws";
+    else if (this.type === "bybit" && this.tradeType == "futures") url = "wss://stream.bybit.com/v5/public/linear";
     else throw new Error("Unsupported exchange type: " + this.type);
 
     this.ws = new WebSocket(url);
@@ -85,7 +88,7 @@ export default class UniversalSocket {
           this.type === "bybit" ?
             `tickers.${sym}` :
             {
-              "instType": "SPOT",
+              "instType": this.tradeType == "spot" ? "SPOT" : "USDT-FUTURES",
               "channel": "ticker",
               "instId": sym
             };
@@ -103,7 +106,7 @@ export default class UniversalSocket {
           this.type === "bybit" ?
             `tickers.${sym}` :
             {
-              "instType": "SPOT",
+              "instType":this.tradeType == "spot" ? "SPOT" : "USDT-FUTURES",
               "channel": "ticker",
               "instId": sym
             };
@@ -154,6 +157,8 @@ export default class UniversalSocket {
         );
       } else if (this.type === "bybit") {
         this.ws.send(JSON.stringify({ op: "unsubscribe", args: [topic] }));
+      } else if (this.type === "bitget") {
+        this.ws.send(JSON.stringify({ op: "unsubscribe", args: [topic] }));
       }
     } catch (_) { }
   }
@@ -162,7 +167,6 @@ export default class UniversalSocket {
     let data;
     try {
       data = JSON.parse(raw);
-      console.log("🚀 ~ UniversalSocket ~ _onMessage ~ data:", data)
     } catch (_) {
       return;
     }
@@ -202,6 +206,31 @@ export default class UniversalSocket {
         volumebase: Number(payload?.volume24h)?.toFixed(2),
         volumequote: Number(payload?.turnover24h)?.toFixed(2),
         changePercent: (Number(payload?.price24hPcnt) * 100)?.toFixed(2),
+      };
+      if (normalized?.price){
+      this._emit("ticker", normalized);
+      }
+      return;
+    }
+
+
+    // Biget format
+    if (this.type === "bitget" && data?.action == "snapshot" && data?.arg?.channel == "ticker") {
+      const d = data.data;
+      const payload = Array.isArray(d) ? d[0] : d;
+
+      const normalized = {
+        exchange: "bitget",
+
+        symbol: payload?.instId,
+        price: Number(payload?.lastPr),
+         changePercent: (Number(payload?.change24h) * 100)?.toFixed(2),
+        high: Number(payload?.high24h),
+        low: Number(payload?.low24h),
+        open: Number(payload?.open24h),
+        volumebase: Number(payload?.baseVolume)?.toFixed(2),
+        volumequote: Number(payload?.quoteVolume)?.toFixed(2),
+       
       };
       this._emit("ticker", normalized);
       return;

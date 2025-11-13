@@ -1,6 +1,6 @@
-import UniversalSocket from "universal-socket-react";
+import UniversalSocket from "../../src/index";
 
-const ws = new UniversalSocket({ type: "bitget" });
+const ws = new UniversalSocket({ type: "bitget", tradeType: "spot" });
 
 // Wait until connected
 ws.onOpen(() => {
@@ -19,9 +19,3 @@ setTimeout(() => {
     ws.subscribeTicker(["ETH-USDT"])
 
 }, 10000);
-
-
-// Listen for ticker data
-ws.ticker((data) => {
-    console.log("📊 ticker2:", data);
-});
