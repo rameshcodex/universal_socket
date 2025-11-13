@@ -1,13 +1,13 @@
 import UniversalSocket from "../../src/index";
 
-const ws = new UniversalSocket({ type: "bitget", tradeType: "futures" });
+const ws = new UniversalSocket({ type: "valr", tradeType: "futures" });
 
 // Wait until connected
 ws.onOpen(() => {
     console.log("✅ Socket connected!");
     // ws.subscribeTicker(["BTC-USDT", "LTC-USDT"]);
 
-    ws.subscribeMarketTrade('BCH-USDT')
+    ws.subscribeMarketTrade('BTC-USDT')
 });
 
 // // Listen for ticker data

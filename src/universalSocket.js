@@ -89,7 +89,17 @@ export default class UniversalSocket {
       if (this.tradeType === "futures") {
         normalized = symbols.map((s) => s.replace(/\W/g, "").toUpperCase() + "PERP");
       }
-      this._sendSubscribe(normalized);
+      this._sendSubscribe({
+        "type": "SUBSCRIBE",
+        "subscriptions": [
+          {
+            "event": "MARKET_SUMMARY_UPDATE",
+            "pairs":
+              normalized
+
+          }
+        ]
+      });
     }
     else {
       normalized.forEach((sym) => {
@@ -115,7 +125,17 @@ export default class UniversalSocket {
     const normalized = symbols.map((s) => s.replace(/\W/g, "").toUpperCase());
 
     if (this.type == "valr") {
-      this._unsendSubscribe(normalized);
+      this._unsendSubscribe({
+        "type": "UNSUBSCRIBE",
+        "subscriptions": [
+          {
+            "event": "MARKET_SUMMARY_UPDATE",
+            "pairs":
+              normalized
+
+          }
+        ]
+      });
     }
     else {
       normalized.forEach((sym) => {
@@ -146,7 +166,17 @@ export default class UniversalSocket {
       if (this.tradeType === "futures") {
         normalized = symbols.map((s) => s.replace(/\W/g, "").toUpperCase() + "PERP");
       }
-      this._sendSubscribe(normalized);
+      this._sendSubscribe({
+        "type": "SUBSCRIBE",
+        "subscriptions": [
+          {
+            "event": "NEW_TRADE",
+            "pairs":
+              normalized
+
+          }
+        ]
+      });
     }
     else {
       normalized.forEach((sym) => {
@@ -172,7 +202,16 @@ export default class UniversalSocket {
     const normalized = symbols.map((s) => s.replace(/\W/g, "").toUpperCase());
 
     if (this.type == "valr") {
-      this._unsendSubscribe(normalized);
+      this._unsendSubscribe({
+        "type": "UNSUBSCRIBE",
+        "subscriptions": [
+          {
+            "event": "NEW_TRADE",
+            "pairs":
+              normalized
+          }
+        ]
+      });
     }
     else {
       normalized.forEach((sym) => {
@@ -242,17 +281,7 @@ export default class UniversalSocket {
       } else if (this.type === "bitget") {
         this.ws.send(JSON.stringify({ op: "subscribe", args: [topic] }));
       } else if (this.type === "valr") {
-        this.ws.send(JSON.stringify({
-          "type": "SUBSCRIBE",
-          "subscriptions": [
-            {
-              "event": "MARKET_SUMMARY_UPDATE",
-              "pairs":
-                topic
-
-            }
-          ]
-        }));
+        this.ws.send(JSON.stringify(topic));
       }
     } catch (_) { }
   }
@@ -269,15 +298,7 @@ export default class UniversalSocket {
       } else if (this.type === "bitget") {
         this.ws.send(JSON.stringify({ op: "unsubscribe", args: [topic] }));
       } else if (this.type === "valr") {
-        this.ws.send(JSON.stringify({
-          "type": "UNSUBSCRIBE",
-          "subscriptions": [
-            {
-              "event": "MARKET_SUMMARY_UPDATE",
-              "pairs": topic
-            }
-          ]
-        }));
+        this.ws.send(JSON.stringify(topic));
       }
     } catch (_) { }
   }
@@ -439,6 +460,25 @@ export default class UniversalSocket {
       };
       this._emit("ticker", normalized);
       return;
+    }
+
+    if (this.type === "valr" && data?.type == "NEW_TRADE") {
+      const d = data.data;
+      const payload = d
+      const normalized = {
+        exchange: "valr",
+
+        symbol: payload?.currencyPair,
+        price: Number(payload?.price),
+        quantity: Number(payload?.quantity),
+        marketMaker: payload?.takerSide === "buy" ? false : true, // is true then show red if false then show green
+        TradeTime: payload?.tradedAt?.split('T')[1]?.split('.')[0],
+        Eventtime: payload?.tradedAt?.split('T')[1]?.split('.')[0],
+        tradeId: payload?.id,
+      };
+      this._emit("markettrade", [normalized]);
+      return;
+
     }
   }
 
