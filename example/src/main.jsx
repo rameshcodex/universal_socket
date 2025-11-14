@@ -1,13 +1,31 @@
 import UniversalSocket from "../../src/index";
 
-const ws = new UniversalSocket({ type: "valr", tradeType: "futures" });
+const ws = new UniversalSocket({ type: "binance", tradeType: "futures" });
 
 // Wait until connected
-ws.onOpen(() => {
+ws.onOpen(async () => {
     console.log("✅ Socket connected!");
     // ws.subscribeTicker(["BTC-USDT", "LTC-USDT"]);
 
-    ws.subscribeMarketTrade('BTC-USDT')
+    let localOrderBook = {
+        lastUpdateId: 0,
+        bids: [], // array: [[price, qty]]
+        asks: []  // array: [[price, qty]]
+    };
+
+    // const url = `https://fapi.binance.com/api/v3/depth?symbol=BCHUSDT&limit=5000`;
+
+    // const res = await fetch(url);
+    // const json = await res.json();
+
+    // localOrderBook.lastUpdateId = json.lastUpdateId;
+    // localOrderBook.bids = json.bids;
+    // localOrderBook.asks = json.asks;
+
+    console.log("📥 SNAPSHOT LOADED", localOrderBook);
+
+
+    ws.subscribeOrderBook('BCH-USDT', localOrderBook, 20)
 });
 
 // // Listen for ticker data
@@ -17,9 +35,11 @@ ws.onOpen(() => {
 
 
 //Listen for trade data
-ws.markettrade((data) => {
-    console.log("📊 marketTrade:", data);
+ws.orderbook((data) => {
+    console.log("📊 orderbook:", data?.bids);
 });
+
+
 
 // setTimeout(() => {
 //     ws.UnsubscribeTicker(["BTC-USDT", "LTC-USDT"])

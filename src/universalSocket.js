@@ -18,11 +18,14 @@ export default class UniversalSocket {
     this.callbacks = {
       ticker: new Set(),
       open: new Set(),
-      markettrade: new Set()
+      markettrade: new Set(),
+      orderbook: new Set()
     };
     this.subscribedTopics = new Set();
     this.ready = false;
     this._reconnectTimeout = 2000;
+    this.localOrderBook = {};
+    this.orderBookLimit = 20
 
     if (autoConnect) this.connect();
   }
@@ -232,6 +235,18 @@ export default class UniversalSocket {
     }
   }
 
+  subscribeOrderBook(symbol, localOrderBook, limit) {
+    this.localOrderBook = localOrderBook
+    this.orderBookLimit = limit
+
+    var normalized = symbol.replace(/\W/g, "".toUpperCase());
+    const topic =
+      this.type === "binance"
+      && `${normalized.toLowerCase()}@depth`
+
+    this._sendSubscribe(topic);
+  }
+
 
   ticker(callback) {
     if (typeof callback !== "function")
@@ -246,6 +261,12 @@ export default class UniversalSocket {
       throw new Error("callback must be function");
     this.callbacks.markettrade.add(callback);
     return () => this.callbacks.markettrade.delete(callback);
+  }
+
+  orderbook(callback) {
+    if (typeof callback !== "function") return;
+    this.callbacks.orderbook.add(callback);
+    return () => this.callbacks.orderbook.delete(callback);
   }
 
   close() {
@@ -307,10 +328,71 @@ export default class UniversalSocket {
     let data;
     try {
       data = JSON.parse(raw);
-      console.log("🚀 ~ UniversalSocket ~ _onMessage ~ data:", data)
+      // console.log("🚀 ~ UniversalSocket ~ _onMessage ~ data:", data)
     } catch (_) {
       return;
     }
+
+    if (this.type === "binance" && data?.e === "depthUpdate") {
+
+      // Create empty orderbook if not exists
+      if (!this.localOrderBook) {
+        this.localOrderBook = {
+          bids: [],
+          asks: [],
+          lastUpdateId: 0
+        };
+      }
+
+      const ob = this.localOrderBook;
+
+      const U = data.U;
+      const u = data.u;
+
+      // If first time receiving update → just set lastUpdateId and continue
+      if (ob.lastUpdateId === 0) {
+        ob.lastUpdateId = u;
+      }
+
+      // Ignore old updates
+      if (u <= ob.lastUpdateId) return;
+
+      // ---------- APPLY BIDS ----------
+      data.b.forEach(([price, qty]) => {
+        if (Number(qty) === 0) {
+          ob.bids = ob.bids.filter(([p]) => p !== price);
+        } else {
+          const idx = ob.bids.findIndex(([p]) => p === price);
+          if (idx >= 0) ob.bids[idx] = [price, qty];
+          else ob.bids.push([price, qty]);
+        }
+      });
+
+      // ---------- APPLY ASKS ----------
+      data.a.forEach(([price, qty]) => {
+        if (Number(qty) === 0) {
+          ob.asks = ob.asks.filter(([p]) => p !== price);
+        } else {
+          const idx = ob.asks.findIndex(([p]) => p === price);
+          if (idx >= 0) ob.asks[idx] = [price, qty];
+          else ob.asks.push([price, qty]);
+        }
+      });
+
+      // Sort orderbook
+      ob.bids.sort((a, b) => Number(b[0]) - Number(a[0]));
+      ob.asks.sort((a, b) => Number(a[0]) - Number(b[0]));
+
+      ob.lastUpdateId = u;
+
+      // Emit updated depth
+      this._emit("orderbook", {
+        bids: ob.bids.slice(0, this.orderBookLimit),
+        asks: ob.asks.slice(0, this.orderBookLimit)
+      });
+    }
+
+
 
     // Binance format
     if (this.type === "binance" && data.e === "24hrTicker") {
@@ -345,11 +427,7 @@ export default class UniversalSocket {
     }
 
     // Bybit format
-    if (
-      this.type === "bybit" &&
-      typeof data.topic === "string" &&
-      data.topic.startsWith("tickers.")
-    ) {
+    if (this.type === "bybit" && typeof data.topic === "string" && data.topic.startsWith("tickers.")) {
       const d = data.data;
       const payload = Array.isArray(d) ? d[0] : d;
       const normalized = {
@@ -369,11 +447,7 @@ export default class UniversalSocket {
       return;
     }
 
-    if (
-      this.type === "bybit" &&
-      typeof data.topic === "string" &&
-      data.topic.startsWith("publicTrade.")
-    ) {
+    if (this.type === "bybit" && typeof data.topic === "string" && data.topic.startsWith("publicTrade.")) {
       const d = data.data;
       const payload = Array.isArray(d) ? d[0] : d;
       const normalized = {
