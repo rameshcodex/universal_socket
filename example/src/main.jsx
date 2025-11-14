@@ -1,17 +1,21 @@
 import UniversalSocket from "../../src/index";
 
-const ws = new UniversalSocket({ type: "valr", tradeType: "futures" });
+const ws = new UniversalSocket({ type: "valr", tradeType: "spot", token: "2neAiuYvAU61ZDXANAGAsiL4-iAExhsBXZxftpOeh_55i3Ysy2q2LEsEWU64mdzUOPusi34M_wGoSf7iNyEWJ2ljgvzaRbUUQcT86boTTGzZ4XZ56aBoAdiYB9J6i9GjsxUuhPw3Blq6rhZlGykT3Vp1phUafnulOOpts-MEmEH9cHHB6n_L7flU1QanmmXtJBvJHl5Vs9Y=.NiFMuMy2BcNX1-3zI4topA==" });
 
 // Wait until connected
 ws.onOpen(async () => {
     console.log("✅ Socket connected!");
     // ws.subscribeTicker(["BTC-USDT", "LTC-USDT"]);
 
-    // let localOrderBook = {
-    //     lastUpdateId: 0,
-    //     bids: [], // array: [[price, qty]]
-    //     asks: []  // array: [[price, qty]]
-    // };
+    // ws.ticker((data) => {
+    //     console.log("📊 ticker:", data);
+    // })
+
+    let localOrderBook = {
+        lastUpdateId: 0,
+        bids: [], // array: [[price, qty]]
+        asks: []  // array: [[price, qty]]
+    };
 
     // const url = `https://fapi.binance.com/api/v3/depth?symbol=BCHUSDT&limit=5000`;
 
@@ -44,7 +48,7 @@ ws.onOpen(async () => {
 
     // console.log("📥 BYBIT SNAPSHOT LOADED", localOrderBook);
 
-    // ws.subscribeOrderBook("RENDER-USDT", localOrderBook, 20);
+    ws.subscribeOrderBook("BTC-USDT", localOrderBook, 20);
 
     // let localOrderBook = {
     //     bids: [],
@@ -65,11 +69,11 @@ ws.onOpen(async () => {
     // ws.subscribeOrderBook("BCH-USDT", localOrderBook, 20);
 
 
-    let localOrderBook = {
-        bids: [],
-        asks: [],
-        lastUpdateId: 0
-    };
+    // let localOrderBook = {
+    //     bids: [],
+    //     asks: [],
+    //     lastUpdateId: 0
+    // };
 
     // const snapshotUrl = `https://api.valr.com/v1/public/BTCUSDT/orderbook`;
 
@@ -84,7 +88,7 @@ ws.onOpen(async () => {
 
     // console.log("📥 VALR SNAPSHOT LOADED", localOrderBook);
 
-    ws.subscribeOrderBook("BTCUSDT", localOrderBook, 20);
+    // ws.subscribeOrderBook("BTCUSDT", localOrderBook, 20);
 
 
 
@@ -95,6 +99,10 @@ ws.onOpen(async () => {
 //     console.log("📊 ticker:", data);
 // });
 
+
+setTimeout(() => {
+    ws.unSubscribeOrderBook("BTC-USDT")
+}, 10000);
 
 //Listen for trade data
 ws.orderbook((data) => {

@@ -11,7 +11,7 @@
  */
 
 export default class UniversalSocket {
-  constructor({ type = "binance", autoConnect = true, tradeType = "spot" } = {}) {
+  constructor({ type = "binance", autoConnect = true, tradeType = "spot", token = "" } = {}) {
     this.type = String(type).toLowerCase();
     this.tradeType = String(tradeType).toLowerCase();
     this.ws = null;
@@ -21,6 +21,7 @@ export default class UniversalSocket {
       markettrade: new Set(),
       orderbook: new Set()
     };
+    this.currentSocketToken = token
     this.subscribedTopics = new Set();
     this.ready = false;
     this._reconnectTimeout = 2000;
@@ -39,7 +40,8 @@ export default class UniversalSocket {
     else if (this.type === "bybit" && this.tradeType == "spot") url = "wss://stream.bybit.com/v5/public/spot";
     else if (this.type === "bybit" && this.tradeType == "futures") url = "wss://stream.bybit.com/v5/public/linear";
     else if (this.type === "bitget") url = "wss://ws.bitget.com/v2/ws/public";
-    else if (this.type === "valr") url = "wss://api.valr.com/ws/trade"
+    else if (this.type === "valr") url = "wss://api.valr.com/ws/trade";
+    else if (this.type === "kucoin" && this.tradeType == "spot") url = `wss://ws-api-spot.kucoin.com?token=${this.currentSocketToken}`
     else throw new Error("Unsupported exchange type: " + this.type);
 
     this.ws = new WebSocket(url);
@@ -103,6 +105,10 @@ export default class UniversalSocket {
           }
         ]
       });
+    }
+    else if (this.type == "kucoin") {
+      normalized = symbols?.join(",")
+      console.log("🚀 ~ UniversalSocket ~ subscribeTicker ~ normalized:", normalized)
     }
     else {
       normalized.forEach((sym) => {
@@ -275,6 +281,41 @@ export default class UniversalSocket {
     }
   }
 
+  unSubscribeOrderBook(symbol) {
+    var normalized = symbol.replace(/\W/g, "".toUpperCase());
+    if (this.type == "valr") {
+      if (this.tradeType === "futures") {
+        normalized = symbol.replace(/\W/g, "").toUpperCase() + "PERP"
+      }
+      this._unsendSubscribe({
+        "type": "UNSUBSCRIBE",
+        "subscriptions": [
+          {
+            "event": "OB_L1_D20_SNAPSHOT",
+            "pairs":
+              [normalized]
+
+          }
+        ]
+      });
+    } else {
+      const topic =
+        this.type === "binance"
+          ? `${normalized.toLowerCase()}@depth`
+          : this.type === "bybit" ?
+            `orderbook.1000.${normalized}`
+            : this.type === "bitget" ?
+              {
+                "instType": this.tradeType == "spot" ? "SPOT" : "USDT-FUTURES",
+                "channel": "books5",
+                "instId": normalized
+              } :
+              normalized
+
+      this._unsendSubscribe(topic);
+    }
+  }
+
 
   ticker(callback) {
     if (typeof callback !== "function")
@@ -337,6 +378,7 @@ export default class UniversalSocket {
   }
 
   _unsendSubscribe(topic) {
+    console.log("🚀 ~ UniversalSocket ~ _unsendSubscribe ~ topic:", topic)
     if (!this.ws || this.ws.readyState !== 1) return;
     try {
       if (this.type === "binance") {
