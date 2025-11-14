@@ -1,17 +1,17 @@
 import UniversalSocket from "../../src/index";
 
-const ws = new UniversalSocket({ type: "binance", tradeType: "futures" });
+const ws = new UniversalSocket({ type: "bybit", tradeType: "spot" });
 
 // Wait until connected
 ws.onOpen(async () => {
     console.log("✅ Socket connected!");
     // ws.subscribeTicker(["BTC-USDT", "LTC-USDT"]);
 
-    let localOrderBook = {
-        lastUpdateId: 0,
-        bids: [], // array: [[price, qty]]
-        asks: []  // array: [[price, qty]]
-    };
+    // let localOrderBook = {
+    //     lastUpdateId: 0,
+    //     bids: [], // array: [[price, qty]]
+    //     asks: []  // array: [[price, qty]]
+    // };
 
     // const url = `https://fapi.binance.com/api/v3/depth?symbol=BCHUSDT&limit=5000`;
 
@@ -22,10 +22,29 @@ ws.onOpen(async () => {
     // localOrderBook.bids = json.bids;
     // localOrderBook.asks = json.asks;
 
-    console.log("📥 SNAPSHOT LOADED", localOrderBook);
+    // console.log("📥 SNAPSHOT LOADED", localOrderBook);
 
 
-    ws.subscribeOrderBook('BCH-USDT', localOrderBook, 20)
+    // ws.subscribeOrderBook('BCH-USDT', localOrderBook, 20)
+
+
+    let localOrderBook = {
+        bids: [],
+        asks: [],
+        lastUpdateId: 0
+    };
+
+    const url = `https://api.bybit.com/v5/market/orderbook?category=spot&symbol=RENDERUSDT&limit=20`;
+    const res = await fetch(url);
+    const json = await res.json();
+
+    localOrderBook.bids = json.result.b;
+    localOrderBook.asks = json.result.a;
+    localOrderBook.lastUpdateId = json.result.u;
+
+    console.log("📥 BYBIT SNAPSHOT LOADED", localOrderBook);
+
+    ws.subscribeOrderBook("RENDER-USDT", localOrderBook, 20);
 });
 
 // // Listen for ticker data
@@ -36,7 +55,15 @@ ws.onOpen(async () => {
 
 //Listen for trade data
 ws.orderbook((data) => {
-    console.log("📊 orderbook:", data?.bids);
+    console.log("📊 orderbook:", data?.asks[2]);
+    console.log("📊 orderbook:", data?.asks[1]);
+    console.log("📊 orderbook:", data?.asks[0]);
+    console.log("  ")
+    console.log("📊 orderbook:", data?.bids[0]);
+    console.log("📊 orderbook:", data?.bids[1]);
+    console.log("📊 orderbook:", data?.bids[2]);
+    console.log("  ")
+    console.log("  ")
 });
 
 

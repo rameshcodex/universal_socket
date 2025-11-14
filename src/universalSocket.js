@@ -242,7 +242,9 @@ export default class UniversalSocket {
     var normalized = symbol.replace(/\W/g, "".toUpperCase());
     const topic =
       this.type === "binance"
-      && `${normalized.toLowerCase()}@depth`
+        ? `${normalized.toLowerCase()}@depth`
+        : this.type === "bybit" &&
+        `orderbook.1000.${normalized}`
 
     this._sendSubscribe(topic);
   }
@@ -466,6 +468,67 @@ export default class UniversalSocket {
       }
       return;
     }
+
+    if (this.type === "bybit" && typeof data.topic === "string" && data.topic.startsWith("orderbook.")) {
+
+      // Create orderbook if first time
+      if (!this.localOrderBook) {
+        this.localOrderBook = {
+          bids: [],
+          asks: [],
+          lastUpdateId: 0
+        };
+      }
+
+      const ob = this.localOrderBook;
+
+      const updateId = data?.data?.u; // Bybit update ID
+
+      // First update → just set last id
+      if (ob.lastUpdateId === 0) {
+        ob.lastUpdateId = updateId;
+      }
+
+      // Ignore out-of-order updates
+      if (updateId <= ob.lastUpdateId) return;
+
+      // ---------- APPLY BIDS ----------
+      data?.data?.b.forEach(([price, qty]) => {
+        if (Number(qty) === 0) {
+          ob.bids = ob.bids.filter(([p]) => p !== price);
+        } else {
+          const idx = ob.bids.findIndex(([p]) => p === price);
+          if (idx >= 0) ob.bids[idx] = [price, qty];
+          else ob.bids.push([price, qty]);
+        }
+      });
+
+      // ---------- APPLY ASKS ----------
+      data?.data?.a.forEach(([price, qty]) => {
+        if (Number(qty) === 0) {
+          ob.asks = ob.asks.filter(([p]) => p !== price);
+        } else {
+          const idx = ob.asks.findIndex(([p]) => p === price);
+          if (idx >= 0) ob.asks[idx] = [price, qty];
+          else ob.asks.push([price, qty]);
+        }
+      });
+
+      // Sort orderbook
+      ob.bids.sort((a, b) => Number(b[0]) - Number(a[0])); // high → low
+      ob.asks.sort((a, b) => Number(a[0]) - Number(b[0])); // low → high
+
+      // Update last id
+      ob.lastUpdateId = updateId;
+
+      // Emit updated orderbook
+      this._emit("orderbook", {
+        bids: ob.bids.slice(0, this.orderBookLimit),
+        asks: ob.asks.slice(0, this.orderBookLimit)
+      });
+    }
+
+
 
 
     // Biget format
