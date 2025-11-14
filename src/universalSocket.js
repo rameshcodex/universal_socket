@@ -240,13 +240,39 @@ export default class UniversalSocket {
     this.orderBookLimit = limit
 
     var normalized = symbol.replace(/\W/g, "".toUpperCase());
-    const topic =
-      this.type === "binance"
-        ? `${normalized.toLowerCase()}@depth`
-        : this.type === "bybit" &&
-        `orderbook.1000.${normalized}`
 
-    this._sendSubscribe(topic);
+
+    if (this.type == "valr") {
+      if (this.tradeType === "futures") {
+        normalized = symbol.replace(/\W/g, "").toUpperCase() + "PERP"
+      }
+      this._sendSubscribe({
+        "type": "SUBSCRIBE",
+        "subscriptions": [
+          {
+            "event": "OB_L1_D20_SNAPSHOT",
+            "pairs":
+              [normalized]
+
+          }
+        ]
+      });
+    } else {
+      const topic =
+        this.type === "binance"
+          ? `${normalized.toLowerCase()}@depth`
+          : this.type === "bybit" ?
+            `orderbook.1000.${normalized}`
+            : this.type === "bitget" ?
+              {
+                "instType": this.tradeType == "spot" ? "SPOT" : "USDT-FUTURES",
+                "channel": "books5",
+                "instId": normalized
+              } :
+              normalized
+
+      this._sendSubscribe(topic);
+    }
   }
 
 
@@ -293,6 +319,7 @@ export default class UniversalSocket {
   };
 
   _sendSubscribe(topic) {
+    console.log("🚀 ~ UniversalSocket ~ _sendSubscribe ~ topic:", topic)
     if (!this.ws || this.ws.readyState !== 1) return;
     try {
       if (this.type === "binance") {
@@ -330,7 +357,7 @@ export default class UniversalSocket {
     let data;
     try {
       data = JSON.parse(raw);
-      // console.log("🚀 ~ UniversalSocket ~ _onMessage ~ data:", data)
+      console.log("🚀 ~ UniversalSocket ~ _onMessage ~ data:", data)
     } catch (_) {
       return;
     }
@@ -393,8 +420,6 @@ export default class UniversalSocket {
         asks: ob.asks.slice(0, this.orderBookLimit)
       });
     }
-
-
 
     // Binance format
     if (this.type === "binance" && data.e === "24hrTicker") {
@@ -528,9 +553,6 @@ export default class UniversalSocket {
       });
     }
 
-
-
-
     // Biget format
     if (this.type === "bitget" && data?.action == "snapshot" && data?.arg?.channel == "ticker") {
       const d = data.data;
@@ -578,6 +600,34 @@ export default class UniversalSocket {
       this._emit("markettrade", normalized);
       return;
     }
+    if (this.type === "bitget" && data?.arg?.channel === "books5") {
+
+      const update = data.data?.[0];
+      if (!update) return;
+
+      // Create orderbook if not exists
+      if (!this.localOrderBook) {
+        this.localOrderBook = {
+          bids: [],
+          asks: []
+        };
+      }
+
+      const ob = this.localOrderBook;
+
+      // Bitget books5 = always full top-N snapshot ✔
+      ob.bids = update.bids;
+      ob.asks = update.asks;
+
+      // Sort orderbook correctly
+      ob.bids.sort((a, b) => Number(b[0]) - Number(a[0])); // high → low
+      ob.asks.sort((a, b) => Number(a[0]) - Number(b[0])); // low → high
+
+      this._emit("orderbook", {
+        bids: ob.bids.slice(0, this.orderBookLimit),
+        asks: ob.asks.slice(0, this.orderBookLimit)
+      });
+    }
 
     if (this.type === "valr" && data?.type == "MARKET_SUMMARY_UPDATE") {
       const d = data.data;
@@ -617,6 +667,42 @@ export default class UniversalSocket {
       return;
 
     }
+
+    if (this.type === "valr" && data?.type === "OB_L1_D20_SNAPSHOT") {
+
+      const obData = data.d;
+      if (!obData) return;
+
+      // Initialize orderbook if needed
+      if (!this.localOrderBook) {
+        this.localOrderBook = {
+          bids: [],
+          asks: [],
+          lastUpdateId: 0
+        };
+      }
+
+      const ob = this.localOrderBook;
+
+      // Replace entire book (top 20)
+      ob.bids = obData.b;   // [["96887","0.05"], ...]
+      ob.asks = obData.a;
+
+      // Sort the data to be safe
+      ob.bids.sort((a, b) => Number(b[0]) - Number(a[0]));   // high → low
+      ob.asks.sort((a, b) => Number(a[0]) - Number(b[0]));   // low → high
+
+      // Update sequence using timestamp (optional)
+      ob.lastUpdateId = obData.lc;
+
+      // Emit the updated book
+      this._emit("orderbook", {
+        bids: ob.bids.slice(0, this.orderBookLimit),
+        asks: ob.asks.slice(0, this.orderBookLimit)
+      });
+    }
+
+
   }
 
   _emit(type, data) {
