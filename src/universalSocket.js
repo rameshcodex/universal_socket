@@ -42,6 +42,7 @@ export default class UniversalSocket {
     else if (this.type === "bitget") url = "wss://ws.bitget.com/v2/ws/public";
     else if (this.type === "valr") url = "wss://api.valr.com/ws/trade";
     else if (this.type === "kucoin" && this.tradeType == "spot") url = `wss://ws-api-spot.kucoin.com?token=${this.currentSocketToken}`
+    else if (this.type === "kucoin" && this.tradeType == "futures") url = `wss://ws-api-futures.kucoin.com?token=${this.currentSocketToken}`
     else throw new Error("Unsupported exchange type: " + this.type);
 
     this.ws = new WebSocket(url);
@@ -107,8 +108,18 @@ export default class UniversalSocket {
       });
     }
     else if (this.type == "kucoin") {
-      normalized = symbols?.join(",")
-      console.log("🚀 ~ UniversalSocket ~ subscribeTicker ~ normalized:", normalized)
+
+      if (this.tradeType === "spot") {
+        normalized = symbols?.join(",")
+        normalized = `/market/snapshot:${normalized}`
+        this._sendSubscribe(normalized);
+      } else {
+        normalized = symbols.map((s) => s.replace(/\W/g, "").toUpperCase() + "M");
+        normalized = normalized?.join(",")
+        normalized = `/contractMarket/snapshot:${normalized}`
+        this._sendSubscribe(normalized);
+      }
+
     }
     else {
       normalized.forEach((sym) => {
@@ -131,7 +142,7 @@ export default class UniversalSocket {
 
   UnsubscribeTicker(symbols = []) {
     if (!Array.isArray(symbols)) symbols = [symbols];
-    const normalized = symbols.map((s) => s.replace(/\W/g, "").toUpperCase());
+    var normalized = symbols.map((s) => s.replace(/\W/g, "").toUpperCase());
 
     if (this.type == "valr") {
       this._unsendSubscribe({
@@ -145,6 +156,18 @@ export default class UniversalSocket {
           }
         ]
       });
+    }
+    else if (this.type == "kucoin") {
+      if (this.tradeType === "spot") {
+        normalized = symbols?.join(",")
+        normalized = `/market/snapshot:${normalized}`
+        this._unsendSubscribe(normalized);
+      } else {
+        normalized = symbols.map((s) => s.replace(/\W/g, "").toUpperCase() + "M");
+        normalized = normalized?.join(",")
+        normalized = `/contractMarket/snapshot:${normalized}`
+        this._unsendSubscribe(normalized);
+      }
     }
     else {
       normalized.forEach((sym) => {
@@ -186,6 +209,17 @@ export default class UniversalSocket {
           }
         ]
       });
+    } else if (this.type == "kucoin") {
+      if (this.tradeType === "spot") {
+        normalized = symbols?.join(",")
+        normalized = `/market/match:${normalized}`
+        this._sendSubscribe(normalized);
+      } else {
+        normalized = symbols.map((s) => s.replace(/\W/g, "").toUpperCase() + "M");
+        normalized = normalized?.join(",")
+        normalized = `/contractMarket/execution:${normalized}`
+        this._sendSubscribe(normalized);
+      }
     }
     else {
       normalized.forEach((sym) => {
@@ -208,7 +242,7 @@ export default class UniversalSocket {
 
   UnsubscribeMarketTrade(symbols = []) {
     if (!Array.isArray(symbols)) symbols = [symbols];
-    const normalized = symbols.map((s) => s.replace(/\W/g, "").toUpperCase());
+    var normalized = symbols.map((s) => s.replace(/\W/g, "").toUpperCase());
 
     if (this.type == "valr") {
       this._unsendSubscribe({
@@ -221,6 +255,18 @@ export default class UniversalSocket {
           }
         ]
       });
+    }
+    else if (this.type == "kucoin") {
+      if (this.tradeType === "spot") {
+        normalized = symbols?.join(",")
+        normalized = `/market/match:${normalized}`
+        this._unsendSubscribe(normalized);
+      } else {
+        normalized = symbols.map((s) => s.replace(/\W/g, "").toUpperCase() + "M");
+        normalized = normalized?.join(",")
+        normalized = `/contractMarket/execution:${normalized}`
+        this._unsendSubscribe(normalized);
+      }
     }
     else {
       normalized.forEach((sym) => {
@@ -263,7 +309,18 @@ export default class UniversalSocket {
           }
         ]
       });
-    } else {
+    }
+    else if (this.type == "kucoin") {
+      if (this.tradeType === "spot") {
+        normalized = `/spotMarket/level2Depth50:${symbol}`
+        this._sendSubscribe(normalized);
+      } else {
+        normalized = symbol.replace(/\W/g, "").toUpperCase() + "M"
+        normalized = `/contractMarket/level2Depth50:${normalized}`
+        this._sendSubscribe(normalized);
+      }
+    }
+    else {
       const topic =
         this.type === "binance"
           ? `${normalized.toLowerCase()}@depth`
@@ -373,6 +430,13 @@ export default class UniversalSocket {
         this.ws.send(JSON.stringify({ op: "subscribe", args: [topic] }));
       } else if (this.type === "valr") {
         this.ws.send(JSON.stringify(topic));
+      } else if (this.type === "kucoin") {
+        this.ws.send(JSON.stringify({
+          "id": Date.now(),
+          "type": "subscribe",
+          "topic": topic,
+          "response": true
+        }));
       }
     } catch (_) { }
   }
@@ -391,6 +455,13 @@ export default class UniversalSocket {
         this.ws.send(JSON.stringify({ op: "unsubscribe", args: [topic] }));
       } else if (this.type === "valr") {
         this.ws.send(JSON.stringify(topic));
+      } else if (this.type === "kucoin") {
+        this.ws.send(JSON.stringify({
+          "id": Date.now(),
+          "type": "unsubscribe",
+          "topic": topic,
+          "response": true
+        }));
       }
     } catch (_) { }
   }
@@ -744,6 +815,138 @@ export default class UniversalSocket {
       });
     }
 
+    if (this.type === "kucoin" && data?.subject == "trade.snapshot") {
+      const payload = data.data?.data?.marketChange24h;
+      // const payload = Array.isArray(d) ? d[0] : d;
+      const normalized = {
+        exchange: "kucoin",
+
+        symbol: data.data?.data?.symbol,
+        price: Number(data.data?.data?.close),
+        high: Number(payload?.high),
+        low: Number(payload?.low),
+        open: Number(payload?.open),
+        volumebase: Number(payload?.vol)?.toFixed(2),
+        volumequote: Number(payload?.volValue)?.toFixed(2),
+        changePercent: (Number(payload?.changeRate) * 100)?.toFixed(2),
+      };
+      if (normalized?.price) {
+        this._emit("ticker", normalized);
+      }
+      return;
+    }
+
+    if (this.type === "kucoin" && data?.subject == "snapshot.24h") {
+      const payload = data.data;
+      // const payload = Array.isArray(d) ? d[0] : d;
+      const normalized = {
+        exchange: "kucoin",
+
+        symbol: payload?.symbol,
+        price: Number(payload?.lastPrice),
+        high: Number(payload?.highPrice),
+        low: Number(payload?.lowPrice),
+        volumebase: Number(payload?.volume)?.toFixed(2),
+        volumequote: Number(payload?.turnover)?.toFixed(2),
+        changePercent: (Number(payload?.priceChgPct) * 100)?.toFixed(2),
+      };
+      if (normalized?.price) {
+        this._emit("ticker", normalized);
+      }
+      return;
+    }
+
+    if (this.type === "kucoin" && data?.subject == "trade.l3match") {
+      const d = data.data;
+      // const payload = Array.isArray(d) ? d[0] : d;
+      var normalized = []
+      // for (let i = 0; i < d.length; i++) {
+      const payload = d
+      var normalizedObj = {
+        exchange: "kucion",
+        symbol: payload?.symbol,
+        price: Number(payload?.price),
+        quantity: Number(payload?.size),
+        marketMaker: payload?.side === "buy" ? false : true, // is true then show red if false then show green
+        TradeTime: this._formatTime(Number(payload?.time) / 1e6),
+        Eventtime: this._formatTime(Number(payload?.time) / 1e6),
+        tradeId: payload?.tradeId,
+        takerOrderId: payload?.takerOrderId,
+        makerOrderId: payload?.makerOrderId,
+        sequence: payload?.sequence
+      };
+
+      normalized.push(normalizedObj)
+      // }
+
+      this._emit("markettrade", normalized);
+      return;
+    }
+
+    if (this.type === "kucoin" && data?.subject == "match") {
+      const d = data.data;
+      // const payload = Array.isArray(d) ? d[0] : d;
+      var normalized = []
+      // for (let i = 0; i < d.length; i++) {
+      const payload = d
+      var normalizedObj = {
+        exchange: "kucion",
+        symbol: payload?.symbol,
+        price: Number(payload?.price),
+        quantity: Number(payload?.size),
+        marketMaker: payload?.side === "buy" ? false : true, // is true then show red if false then show green
+        TradeTime: this._formatTime(Number(payload?.ts) / 1e6),
+        Eventtime: this._formatTime(Number(payload?.ts) / 1e6),
+        tradeId: payload?.tradeId,
+        takerOrderId: payload?.takerOrderId,
+        makerOrderId: payload?.makerOrderId,
+        sequence: payload?.sequence
+      };
+
+      normalized.push(normalizedObj)
+      // }
+
+      this._emit("markettrade", normalized);
+      return;
+    }
+
+    if (
+      this.type === "kucoin" &&
+      data?.topic?.includes("level2Depth50") &&
+      data.type === "message"
+    ) {
+
+      const obData = data.data;
+      if (!obData) return;
+
+      // Initialize if needed
+      if (!this.localOrderBook) {
+        this.localOrderBook = {
+          bids: [],
+          asks: [],
+          lastUpdateId: 0
+        };
+      }
+
+      const ob = this.localOrderBook;
+
+      // Replace full top-50
+      ob.bids = obData.bids;
+      ob.asks = obData.asks;
+
+      // Sort for safety
+      ob.bids.sort((a, b) => Number(b[0]) - Number(a[0])); // high → low
+      ob.asks.sort((a, b) => Number(a[0]) - Number(b[0])); // low → high
+
+      // Use timestamp as lastUpdateId
+      ob.lastUpdateId = obData.timestamp;
+
+      // Emit limited depth
+      this._emit("orderbook", {
+        bids: ob.bids.slice(0, this.orderBookLimit),
+        asks: ob.asks.slice(0, this.orderBookLimit)
+      });
+    }
 
   }
 

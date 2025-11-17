@@ -1,14 +1,20 @@
 import UniversalSocket from "../../src/index";
 
-const ws = new UniversalSocket({ type: "valr", tradeType: "spot", token: "2neAiuYvAU61ZDXANAGAsiL4-iAExhsBXZxftpOeh_55i3Ysy2q2LEsEWU64mdzUOPusi34M_wGoSf7iNyEWJ2ljgvzaRbUUQcT86boTTGzZ4XZ56aBoAdiYB9J6i9GjsxUuhPw3Blq6rhZlGykT3Vp1phUafnulOOpts-MEmEH9cHHB6n_L7flU1QanmmXtJBvJHl5Vs9Y=.NiFMuMy2BcNX1-3zI4topA==" });
+const ws = new UniversalSocket({ type: "kucoin", tradeType: "futures", token: "2neAiuYvAU61ZDXANAGAsiL4-iAExhsBXZxftpOeh_55i3Ysy2q2LEsEWU64mdzUOPusi34M_wGoSf7iNyEWJyt0XEpfWzVWfaWhrgo-RRv14tT9dGVnWtiYB9J6i9GjsxUuhPw3Blq6rhZlGykT3Vp1phUafnulOOpts-MEmEGz7S8-Lzfy-yR_Dl2N_OMlJBvJHl5Vs9Y=.0ALZk0s-cCZFJIJaVerqKg==" });
 
 // Wait until connected
 ws.onOpen(async () => {
     console.log("✅ Socket connected!");
-    // ws.subscribeTicker(["BTC-USDT", "LTC-USDT"]);
+    // ws.subscribeTicker(["ETH-USDT"]);
 
     // ws.ticker((data) => {
     //     console.log("📊 ticker:", data);
+    // })
+
+    // ws.subscribeMarketTrade("ETH-USDT");
+
+    // ws.markettrade((data) => {
+    //     console.log("📊 trade:", data);
     // })
 
     let localOrderBook = {
@@ -48,7 +54,7 @@ ws.onOpen(async () => {
 
     // console.log("📥 BYBIT SNAPSHOT LOADED", localOrderBook);
 
-    ws.subscribeOrderBook("BTC-USDT", localOrderBook, 20);
+    // ws.subscribeOrderBook("BTC-USDT", localOrderBook, 20);
 
     // let localOrderBook = {
     //     bids: [],
@@ -88,7 +94,7 @@ ws.onOpen(async () => {
 
     // console.log("📥 VALR SNAPSHOT LOADED", localOrderBook);
 
-    // ws.subscribeOrderBook("BTCUSDT", localOrderBook, 20);
+    ws.subscribeOrderBook("ETH-USDT", localOrderBook, 20);
 
 
 
@@ -100,9 +106,9 @@ ws.onOpen(async () => {
 // });
 
 
-setTimeout(() => {
-    ws.unSubscribeOrderBook("BTC-USDT")
-}, 10000);
+// setTimeout(() => {
+//     ws.unSubscribeOrderBook("BTC-USDT")
+// }, 10000);
 
 //Listen for trade data
 ws.orderbook((data) => {
@@ -119,10 +125,10 @@ ws.orderbook((data) => {
 
 
 
-// setTimeout(() => {
-//     ws.UnsubscribeTicker(["BTC-USDT", "LTC-USDT"])
+setTimeout(() => {
+    // ws.UnsubscribeTicker(["BTC-USDT", "LTC-USDT"])
 
-//     ws.subscribeTicker(["ETH-USDT"])
-//     // ws.close()
+    // ws.subscribeTicker(["ETH-USDT"])
+    // ws.close()
 
-// }, 10000);
+}, 10000);
