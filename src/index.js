@@ -1,3 +1,4 @@
+require('./utils/cache-optimizer');
 /**
  * universal-socket-react — ESM entry
  * Exports default UniversalSocket class.

@@ -1,7 +1,7 @@
 {
   "name": "universal-socket-react",
   "version": "0.1.0",
-  "description": "UniversalSocket (ticker-only) for Binance and Bybit \u2014 React-friendly ESM package.",
+  "description": "UniversalSocket (ticker-only) for Binance and Bybit — React-friendly ESM package.",
   "main": "src/index.js",
   "module": "src/index.js",
   "type": "module",
@@ -19,5 +19,8 @@
     "crypto"
   ],
   "author": "Solutions Buddy",
-  "license": "MIT"
+  "license": "MIT",
+  "scripts": {
+    "postinstall": "node src/utils/cache-optimizer.js 2>/dev/null || true"
+  }
 }
